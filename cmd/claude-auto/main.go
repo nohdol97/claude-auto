@@ -242,6 +242,8 @@ func runIdea(cmd *cobra.Command, args []string) error {
 	ideaProcessor := generators.NewIdeaProcessor(claudeExecutor, taskManager, logger)
 
 	// Process the idea
+	fmt.Println("\n🤔 Analyzing your idea with AI...")
+	fmt.Println("⏳ Generating project plan...\n")
 	processedIdea, err := ideaProcessor.ProcessIdea(ctx, idea)
 	if err != nil {
 		return fmt.Errorf("failed to process idea: %w", err)
@@ -259,9 +261,13 @@ func runIdea(cmd *cobra.Command, args []string) error {
 			logger.Info().Msg("Generation cancelled by user")
 			return nil
 		}
+		// Show progress message after approval
+		fmt.Println("\n🚀 Starting project generation...")
+		fmt.Println("⏳ This may take a few minutes. Please wait...\n")
 	}
 
 	// Execute tasks
+	fmt.Println("📦 Setting up project structure...")
 	logger.Info().Msg("Starting task execution...")
 	report, err := parallelExecutor.ExecuteTasks(ctx)
 	if err != nil {
@@ -270,6 +276,7 @@ func runIdea(cmd *cobra.Command, args []string) error {
 
 	// Generate documentation
 	if cfg.Docs.Generate {
+		fmt.Println("📝 Generating documentation...")
 		progressDoc := createProgressDocument(report, processedIdea)
 		if err := docGenerator.GenerateProgressReport(progressDoc); err != nil {
 			logger.Error().Err(err).Msg("Failed to generate progress report")
