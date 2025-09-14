@@ -181,6 +181,9 @@ func (ce *ClaudeExecutor) executeOnce(ctx context.Context, prompt string, option
 func (ce *ClaudeExecutor) buildArgs(prompt string, options *ClaudeOptions) []string {
 	args := []string{}
 
+	// Always use print mode for non-interactive output
+	args = append(args, "--print")
+
 	// Always use dangerous mode
 	if ce.dangerousMode {
 		args = append(args, "--dangerously-skip-permissions")
@@ -188,20 +191,19 @@ func (ce *ClaudeExecutor) buildArgs(prompt string, options *ClaudeOptions) []str
 
 	// Add options if provided
 	if options != nil {
-		if options.Role != "" {
-			args = append(args, "--role", options.Role)
+		// Claude CLI doesn't support --role, so we incorporate it into the system prompt
+		systemPrompt := options.SystemPrompt
+		if options.Role != "" && systemPrompt == "" {
+			systemPrompt = fmt.Sprintf("You are a %s.", options.Role)
+		} else if options.Role != "" && systemPrompt != "" {
+			systemPrompt = fmt.Sprintf("You are a %s. %s", options.Role, systemPrompt)
 		}
+
 		if options.Model != "" {
 			args = append(args, "--model", options.Model)
 		}
-		if options.Temperature > 0 {
-			args = append(args, "--temperature", fmt.Sprintf("%.2f", options.Temperature))
-		}
-		if options.MaxTokens > 0 {
-			args = append(args, "--max-tokens", fmt.Sprintf("%d", options.MaxTokens))
-		}
-		if options.SystemPrompt != "" {
-			args = append(args, "--system", options.SystemPrompt)
+		if systemPrompt != "" {
+			args = append(args, "--append-system-prompt", systemPrompt)
 		}
 		args = append(args, options.AdditionalFlags...)
 	}

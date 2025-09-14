@@ -31,7 +31,7 @@ git clone https://github.com/nohdol/claude-auto.git
 cd claude-auto
 
 # 설치 스크립트 실행
-./install.sh
+sudo ./install.sh
 ```
 
 설치 스크립트는 다음 작업을 수행합니다:
