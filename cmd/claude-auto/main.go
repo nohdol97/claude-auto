@@ -118,8 +118,29 @@ func runIdea(cmd *cobra.Command, args []string) error {
 	}()
 
 	// Create project directory
+	// Use current working directory if output dir is not specified
+	if outputDir == "./" || outputDir == "." {
+		cwd, err := os.Getwd()
+		if err != nil {
+			return fmt.Errorf("failed to get current directory: %w", err)
+		}
+		outputDir = cwd
+	}
+
 	projectName := generateProjectName(idea)
 	projectDir := filepath.Join(outputDir, projectName)
+
+	// Check if directory already exists
+	if _, err := os.Stat(projectDir); err == nil {
+		logger.Warn().Str("dir", projectDir).Msg("Directory already exists")
+		fmt.Printf("⚠️  Directory %s already exists. Continue anyway? (y/n): ", projectDir)
+		var response string
+		fmt.Scanln(&response)
+		if response != "y" && response != "Y" {
+			return fmt.Errorf("directory already exists: %s", projectDir)
+		}
+	}
+
 	if err := os.MkdirAll(projectDir, 0755); err != nil {
 		return fmt.Errorf("failed to create project directory: %w", err)
 	}
