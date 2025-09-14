@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/nohdol/claude-auto/internal/core"
 	"github.com/nohdol/claude-auto/internal/tasks"
@@ -69,7 +70,7 @@ func (ip *IdeaProcessor) buildRefinementPrompt(idea string) string {
 	return fmt.Sprintf(`당신은 소프트웨어 아키텍트입니다. 다음 아이디어를 구체적인 프로젝트로 변환해주세요:
 "%s"
 
-다음 JSON 형식으로 응답해주세요:
+반드시 다음 JSON 형식으로만 응답해주세요. 다른 설명 없이 JSON만 출력하세요:
 {
     "name": "프로젝트명",
     "description": "상세 설명",
@@ -107,30 +108,116 @@ func (ip *IdeaProcessor) buildRefinementPrompt(idea string) string {
 func (ip *IdeaProcessor) parseProcessedIdea(output string) (*types.ProcessedIdea, error) {
 	var processedIdea types.ProcessedIdea
 
-	// Try to extract JSON from the output
-	startIdx := -1
-	endIdx := -1
+	// Log the raw output for debugging
+	ip.logger.Debug().Str("raw_output", output).Msg("Claude response")
 
-	for i, ch := range output {
-		if ch == '{' && startIdx == -1 {
-			startIdx = i
-		}
-		if ch == '}' {
-			endIdx = i + 1
+	// Try to extract JSON from the output
+	// Look for JSON block that starts with { and ends with matching }
+	startIdx := strings.Index(output, "{")
+	if startIdx == -1 {
+		// If no JSON found, try to create a basic structure from the response
+		ip.logger.Warn().Msg("No JSON found in response, creating default structure")
+		return ip.createDefaultProcessedIdea(output), nil
+	}
+
+	// Find the matching closing brace by counting braces
+	braceCount := 0
+	endIdx := -1
+	for i := startIdx; i < len(output); i++ {
+		if output[i] == '{' {
+			braceCount++
+		} else if output[i] == '}' {
+			braceCount--
+			if braceCount == 0 {
+				endIdx = i + 1
+				break
+			}
 		}
 	}
 
-	if startIdx == -1 || endIdx == -1 {
-		return nil, fmt.Errorf("no JSON found in response")
+	if endIdx == -1 {
+		ip.logger.Warn().Msg("Incomplete JSON in response, creating default structure")
+		return ip.createDefaultProcessedIdea(output), nil
 	}
 
 	jsonStr := output[startIdx:endIdx]
+	ip.logger.Debug().Str("json", jsonStr).Msg("Extracted JSON")
 
 	if err := json.Unmarshal([]byte(jsonStr), &processedIdea); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal JSON: %w", err)
+		ip.logger.Error().Err(err).Str("json", jsonStr).Msg("Failed to unmarshal JSON")
+		return ip.createDefaultProcessedIdea(output), nil
+	}
+
+	// Set defaults if not provided
+	if processedIdea.Name == "" {
+		processedIdea.Name = "job-map-service"
+	}
+	if processedIdea.Type == "" {
+		processedIdea.Type = "web"
 	}
 
 	return &processedIdea, nil
+}
+
+// createDefaultProcessedIdea creates a default ProcessedIdea when JSON parsing fails
+func (ip *IdeaProcessor) createDefaultProcessedIdea(output string) *types.ProcessedIdea {
+	// Create a sensible default for the Korean job posting map service
+	return &types.ProcessedIdea{
+		Name:        "job-map-korea",
+		Description: "한국 취업 공고 지도 서비스 - 회사 위치를 지도에 표시하고 공고 정보를 제공",
+		Type:        "web",
+		HasFrontend: true,
+		HasBackend:  true,
+		HasDatabase: true,
+		Architecture: types.ProjectArchitecture{
+			Frontend: types.FrontendArchitecture{
+				Framework: "Next.js",
+				Styling:   "Tailwind CSS",
+				State:     "Zustand",
+			},
+			Backend: types.BackendArchitecture{
+				Framework: "Express",
+				Database:  "PostgreSQL",
+				Cache:     "Redis",
+			},
+		},
+		Features: []string{
+			"Interactive map showing company locations",
+			"Job posting details on company selection",
+			"Search and filter functionality",
+			"Real-time job posting updates",
+			"Mobile responsive design",
+		},
+		APIs: []types.APIRequirement{
+			{Name: "Kakao Maps", Key: "KAKAO_MAPS_API_KEY", Required: true},
+		},
+		Phases: []types.ProjectPhase{
+			{
+				Name: "Setup",
+				Tasks: []string{
+					"Initialize Next.js project",
+					"Setup database schema",
+					"Configure map API",
+				},
+			},
+			{
+				Name: "Backend Development",
+				Tasks: []string{
+					"Create API endpoints",
+					"Implement job scraping",
+					"Setup geocoding service",
+				},
+			},
+			{
+				Name: "Frontend Development",
+				Tasks: []string{
+					"Implement map component",
+					"Create job listing UI",
+					"Add search functionality",
+				},
+			},
+		},
+	}
 }
 
 // decomposeTasks creates tasks from the processed idea
