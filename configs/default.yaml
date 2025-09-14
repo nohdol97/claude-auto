@@ -1,0 +1,24 @@
+claude:
+  dangerous_mode: true  # Always use --dangerously-skip-permissions
+  max_retries: 3
+  timeout: 5m
+  model: ""  # Empty means use default model
+
+parallel:
+  max_workers: 3        # Number of parallel workers
+  task_timeout: 10m
+  batch_size: 5
+
+git:
+  auto_commit: true
+  commit_size: small    # atomic, small, medium
+  push_strategy: batch  # immediate, batch, manual
+  author_name: Claude Auto
+  author_email: claude-auto@example.com
+  remote_name: origin
+  default_branch: main
+
+documentation:
+  language: ko          # Korean documentation
+  output_dir: ./docs/progress
+  generate: true
