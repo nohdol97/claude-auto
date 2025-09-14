@@ -164,30 +164,48 @@ func runIdea(cmd *cobra.Command, args []string) error {
 		cancel()
 	}()
 
-	// Create project directory
-	// Use current working directory if output dir is not specified
-	if outputDir == "./" || outputDir == "." {
+	// Use the current directory or specified output directory
+	projectDir := outputDir
+	if outputDir == "./" || outputDir == "." || outputDir == "" {
 		cwd, err := os.Getwd()
 		if err != nil {
 			return fmt.Errorf("failed to get current directory: %w", err)
 		}
-		outputDir = cwd
+		projectDir = cwd
+	} else if !filepath.IsAbs(outputDir) {
+		// If output dir is relative, make it absolute based on current directory
+		cwd, err := os.Getwd()
+		if err != nil {
+			return fmt.Errorf("failed to get current directory: %w", err)
+		}
+		projectDir = filepath.Join(cwd, outputDir)
 	}
 
-	projectName := generateProjectName(idea)
-	projectDir := filepath.Join(outputDir, projectName)
+	// Check if the directory is empty (except for .git and other hidden files)
+	entries, err := os.ReadDir(projectDir)
+	if err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("failed to read directory: %w", err)
+	}
 
-	// Check if directory already exists
-	if _, err := os.Stat(projectDir); err == nil {
-		logger.Warn().Str("dir", projectDir).Msg("Directory already exists")
-		fmt.Printf("⚠️  Directory %s already exists. Continue anyway? (y/n): ", projectDir)
-		var response string
-		fmt.Scanln(&response)
-		if response != "y" && response != "Y" {
-			return fmt.Errorf("directory already exists: %s", projectDir)
+	// Count non-hidden files
+	nonHiddenCount := 0
+	for _, entry := range entries {
+		if !strings.HasPrefix(entry.Name(), ".") {
+			nonHiddenCount++
 		}
 	}
 
+	if nonHiddenCount > 0 {
+		logger.Warn().Str("dir", projectDir).Msg("Directory is not empty")
+		fmt.Printf("⚠️  Directory %s is not empty. Continue anyway? (y/n): ", projectDir)
+		var response string
+		fmt.Scanln(&response)
+		if response != "y" && response != "Y" {
+			return fmt.Errorf("directory not empty: %s", projectDir)
+		}
+	}
+
+	// Create directory if it doesn't exist
 	if err := os.MkdirAll(projectDir, 0755); err != nil {
 		return fmt.Errorf("failed to create project directory: %w", err)
 	}
