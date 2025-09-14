@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/nohdol/claude-auto/internal/core"
 	"github.com/nohdol/claude-auto/internal/docs"
@@ -272,22 +273,63 @@ func runIdea(cmd *cobra.Command, args []string) error {
 }
 
 func generateProjectName(idea string) string {
-	// Simple implementation - in real version, should be more sophisticated
-	if len(idea) > 20 {
-		idea = idea[:20]
+	// For Korean text, use a descriptive English name
+	// Check if the idea contains Korean characters
+	hasKorean := false
+	for _, ch := range idea {
+		if ch >= 0xAC00 && ch <= 0xD7AF { // Korean character range
+			hasKorean = true
+			break
+		}
 	}
+
+	if hasKorean {
+		// Detect common Korean keywords and generate appropriate names
+		if strings.Contains(idea, "취업") || strings.Contains(idea, "채용") || strings.Contains(idea, "공고") {
+			return "job-portal"
+		} else if strings.Contains(idea, "쇼핑") || strings.Contains(idea, "이커머스") {
+			return "shopping-mall"
+		} else if strings.Contains(idea, "게임") {
+			return "game-app"
+		} else if strings.Contains(idea, "채팅") || strings.Contains(idea, "메신저") {
+			return "chat-app"
+		} else if strings.Contains(idea, "블로그") {
+			return "blog-platform"
+		} else if strings.Contains(idea, "교육") || strings.Contains(idea, "학습") {
+			return "edu-platform"
+		} else {
+			// Default for Korean text
+			return fmt.Sprintf("project-%d", time.Now().Unix())
+		}
+	}
+
+	// For English text, clean and use the idea itself
+	if len(idea) > 30 {
+		idea = idea[:30]
+	}
+
 	// Replace spaces with hyphens and remove special characters
 	projectName := ""
-	for _, ch := range idea {
+	for _, ch := range strings.ToLower(idea) {
 		if ch == ' ' {
-			projectName += "-"
-		} else if (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') {
+			if projectName != "" && !strings.HasSuffix(projectName, "-") {
+				projectName += "-"
+			}
+		} else if (ch >= 'a' && ch <= 'z') || (ch >= '0' && ch <= '9') {
 			projectName += string(ch)
 		}
 	}
-	if projectName == "" {
-		projectName = "auto-project"
+
+	// Clean up multiple hyphens and trim
+	projectName = strings.Trim(projectName, "-")
+	for strings.Contains(projectName, "--") {
+		projectName = strings.ReplaceAll(projectName, "--", "-")
 	}
+
+	if projectName == "" {
+		projectName = fmt.Sprintf("project-%d", time.Now().Unix())
+	}
+
 	return projectName
 }
 
