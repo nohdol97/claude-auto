@@ -84,6 +84,14 @@ var refactorCmd = &cobra.Command{
 	RunE:  runRefactor,
 }
 
+var addCmd = &cobra.Command{
+	Use:   "add [feature-name] [description]",
+	Short: "Add a new feature to an existing project",
+	Long:  `Add a new feature to an existing project. The tool will analyze the project structure and generate appropriate code.`,
+	Args:  cobra.MinimumNArgs(2),
+	RunE:  runAdd,
+}
+
 func init() {
 	cobra.OnInitialize(initConfig)
 
@@ -104,6 +112,7 @@ func init() {
 	rootCmd.AddCommand(improveCmd)
 	rootCmd.AddCommand(fixCmd)
 	rootCmd.AddCommand(refactorCmd)
+	rootCmd.AddCommand(addCmd)
 }
 
 func initConfig() {
@@ -596,6 +605,121 @@ Provide the refactored code with explanations.`, projectPath)
 
 	fmt.Println("\n♻️ Refactoring Suggestions:")
 	fmt.Println(response.Output)
+
+	return nil
+}
+
+func runAdd(cmd *cobra.Command, args []string) error {
+	// Get feature name and description
+	featureName := args[0]
+	featureDescription := strings.Join(args[1:], " ")
+
+	// Get project path from current directory
+	projectPath, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("failed to get current directory: %w", err)
+	}
+
+	// Setup logger
+	logger := zerolog.New(os.Stderr).With().Timestamp().Logger()
+
+	// Load configuration
+	cfg, err := core.LoadConfig(configFile)
+	if err != nil {
+		cfg = core.GetDefaultConfig()
+	}
+
+	// Create context
+	ctx := context.Background()
+
+	// Initialize components
+	claudeExecutor := core.NewClaudeExecutor(logger)
+	defer claudeExecutor.Cleanup()
+
+	taskManager := tasks.NewTaskManager(logger)
+	featureGenerator := generators.NewFeatureGenerator(claudeExecutor, taskManager, logger)
+
+	// Initialize Git manager if needed
+	gitManager, err := git.NewGitManager(projectPath, cfg.Git.CommitSize, logger)
+	if err != nil {
+		logger.Warn().Err(err).Msg("Git manager initialization failed, continuing without Git integration")
+	} else {
+		featureGenerator.SetGitManager(gitManager)
+	}
+
+	// Display feature plan
+	fmt.Printf("\n🚀 Adding new feature: %s\n", featureName)
+	fmt.Printf("📝 Description: %s\n", featureDescription)
+	fmt.Printf("📁 Project: %s\n\n", projectPath)
+
+	// Ask for confirmation
+	if !autoApprove {
+		fmt.Print("Proceed with feature generation? (y/n): ")
+		var response string
+		fmt.Scanln(&response)
+		if response != "y" && response != "Y" {
+			return nil
+		}
+	}
+
+	// Add the feature
+	logger.Info().Msg("Generating feature...")
+	result, err := featureGenerator.AddFeature(ctx, projectPath, featureName, featureDescription)
+	if err != nil {
+		return fmt.Errorf("failed to add feature: %w", err)
+	}
+
+	// Display results
+	fmt.Println("\n✅ Feature added successfully!")
+
+	if len(result.FilesCreated) > 0 {
+		fmt.Println("\n📄 Files Created:")
+		for _, file := range result.FilesCreated {
+			fmt.Printf("  + %s\n", file)
+		}
+	}
+
+	if len(result.FilesModified) > 0 {
+		fmt.Println("\n📝 Files Modified:")
+		for _, file := range result.FilesModified {
+			fmt.Printf("  ~ %s\n", file)
+		}
+	}
+
+	if len(result.TestsCreated) > 0 {
+		fmt.Println("\n🧪 Tests Created:")
+		for _, test := range result.TestsCreated {
+			fmt.Printf("  + %s\n", test)
+		}
+	}
+
+	// Save documentation
+	if result.Documentation != "" {
+		docPath := filepath.Join(projectPath, "docs", fmt.Sprintf("feature-%s.md", featureName))
+		if err := os.MkdirAll(filepath.Dir(docPath), 0755); err == nil {
+			if err := os.WriteFile(docPath, []byte(result.Documentation), 0644); err == nil {
+				fmt.Printf("\n📚 Documentation saved to: %s\n", docPath)
+			}
+		}
+	}
+
+	// Commit changes if Git is available
+	if gitManager != nil && cfg.Git.AutoCommit {
+		allFiles := append(result.FilesCreated, result.FilesModified...)
+		if len(allFiles) > 0 {
+			if err := gitManager.SmartCommit(allFiles, types.TaskTypeFrontend); err != nil {
+				logger.Warn().Err(err).Msg("Failed to commit changes")
+			} else {
+				fmt.Println("\n✅ Changes committed to Git")
+			}
+		}
+	}
+
+	fmt.Println("\n🎉 Feature implementation complete!")
+	fmt.Println("\nNext steps:")
+	fmt.Println("  1. Review the generated code")
+	fmt.Println("  2. Run tests")
+	fmt.Println("  3. Make any necessary adjustments")
 
 	return nil
 }

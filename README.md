@@ -91,6 +91,22 @@ claude-auto fix . "메모리 누수 문제 해결"
 claude-auto refactor
 ```
 
+### 기능 추가
+
+```bash
+# 기존 프로젝트에 새 기능 추가
+claude-auto add "사용자 인증" "JWT 기반 로그인/로그아웃 기능 구현"
+
+# 예시: API 기능 추가
+claude-auto add "결제 시스템" "Stripe API를 활용한 결제 처리 기능"
+
+# 예시: UI 컴포넌트 추가
+claude-auto add "대시보드" "관리자용 통계 대시보드 페이지"
+
+# 예시: 풀스택 기능 추가
+claude-auto add "실시간 알림" "WebSocket 기반 실시간 알림 시스템"
+```
+
 ### 고급 옵션
 
 ```bash
