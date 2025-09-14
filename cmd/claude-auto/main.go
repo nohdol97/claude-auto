@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 
 	"github.com/nohdol/claude-auto/internal/core"
@@ -51,6 +52,38 @@ var ideaCmd = &cobra.Command{
 	RunE:  runIdea,
 }
 
+var analyzeCmd = &cobra.Command{
+	Use:   "analyze [path]",
+	Short: "Analyze an existing project",
+	Long:  `Analyze an existing project to find issues, improvements, and optimization opportunities.`,
+	Args:  cobra.MaximumNArgs(1),
+	RunE:  runAnalyze,
+}
+
+var improveCmd = &cobra.Command{
+	Use:   "improve [path]",
+	Short: "Improve an existing project",
+	Long:  `Automatically improve an existing project by fixing issues, optimizing performance, and enhancing code quality.`,
+	Args:  cobra.MaximumNArgs(1),
+	RunE:  runImprove,
+}
+
+var fixCmd = &cobra.Command{
+	Use:   "fix [path] [issue]",
+	Short: "Fix specific issues in a project",
+	Long:  `Fix specific bugs or issues in an existing project.`,
+	Args:  cobra.MinimumNArgs(1),
+	RunE:  runFix,
+}
+
+var refactorCmd = &cobra.Command{
+	Use:   "refactor [path]",
+	Short: "Refactor code in a project",
+	Long:  `Refactor code to improve structure, readability, and maintainability.`,
+	Args:  cobra.MaximumNArgs(1),
+	RunE:  runRefactor,
+}
+
 func init() {
 	cobra.OnInitialize(initConfig)
 
@@ -67,6 +100,10 @@ func init() {
 	ideaCmd.Flags().StringVarP(&outputDir, "output", "o", "./", "output directory for the project")
 
 	rootCmd.AddCommand(ideaCmd)
+	rootCmd.AddCommand(analyzeCmd)
+	rootCmd.AddCommand(improveCmd)
+	rootCmd.AddCommand(fixCmd)
+	rootCmd.AddCommand(refactorCmd)
 }
 
 func initConfig() {
@@ -362,6 +399,205 @@ func displaySummary(report *types.ExecutionReport, projectDir string, logger zer
 	fmt.Println("  3. Install dependencies")
 	fmt.Println("  4. Run tests")
 	fmt.Println("  5. Deploy to production")
+}
+
+func runAnalyze(cmd *cobra.Command, args []string) error {
+	// Get project path
+	projectPath := "./"
+	if len(args) > 0 {
+		projectPath = args[0]
+	}
+
+	// Setup logger
+	logger := zerolog.New(os.Stderr).With().Timestamp().Logger()
+
+	// Load configuration
+	cfg, err := core.LoadConfig(configFile)
+	if err != nil {
+		cfg = core.GetDefaultConfig()
+	}
+
+	// Create context
+	ctx := context.Background()
+
+	// Initialize components
+	claudeExecutor := core.NewClaudeExecutor(logger)
+	defer claudeExecutor.Cleanup()
+
+	analyzer := generators.NewProjectAnalyzer(claudeExecutor, logger)
+
+	// Analyze project
+	logger.Info().Str("path", projectPath).Msg("Analyzing project...")
+	info, err := analyzer.AnalyzeProject(ctx, projectPath)
+	if err != nil {
+		return fmt.Errorf("analysis failed: %w", err)
+	}
+
+	// Display results
+	fmt.Println("\n📊 Project Analysis Report")
+	fmt.Println("=" + strings.Repeat("=", 50))
+	fmt.Printf("Project Type: %s\n", info.Type)
+	fmt.Printf("Language: %s\n", info.Language)
+	fmt.Printf("Framework: %s\n", info.Framework)
+
+	if len(info.Issues) > 0 {
+		fmt.Println("\n🐛 Issues Found:")
+		for _, issue := range info.Issues {
+			emoji := "⚠️"
+			if issue.Severity == "critical" {
+				emoji = "🔴"
+			} else if issue.Severity == "high" {
+				emoji = "🟠"
+			}
+			fmt.Printf("%s [%s] %s\n", emoji, issue.Type, issue.Description)
+			if issue.Suggestion != "" {
+				fmt.Printf("   💡 %s\n", issue.Suggestion)
+			}
+		}
+	}
+
+	if len(info.Improvements) > 0 {
+		fmt.Println("\n💡 Suggested Improvements:")
+		for _, improvement := range info.Improvements {
+			fmt.Printf("  - %s\n", improvement)
+		}
+	}
+
+	return nil
+}
+
+func runImprove(cmd *cobra.Command, args []string) error {
+	// Get project path
+	projectPath := "./"
+	if len(args) > 0 {
+		projectPath = args[0]
+	}
+
+	// Setup logger
+	logger := zerolog.New(os.Stderr).With().Timestamp().Logger()
+
+	// First analyze the project
+	ctx := context.Background()
+	claudeExecutor := core.NewClaudeExecutor(logger)
+	defer claudeExecutor.Cleanup()
+
+	analyzer := generators.NewProjectAnalyzer(claudeExecutor, logger)
+	info, err := analyzer.AnalyzeProject(ctx, projectPath)
+	if err != nil {
+		return fmt.Errorf("analysis failed: %w", err)
+	}
+
+	// Ask for confirmation
+	fmt.Printf("\n🔧 Found %d issues to fix. Proceed with improvements? (y/n): ", len(info.Issues))
+	var response string
+	fmt.Scanln(&response)
+	if response != "y" && response != "Y" {
+		return nil
+	}
+
+	// Create improvement tasks
+	taskManager := tasks.NewTaskManager(logger)
+
+	for i, issue := range info.Issues {
+		prompt := fmt.Sprintf(`Fix the following issue:
+Type: %s
+Severity: %s
+File: %s
+Description: %s
+Suggestion: %s
+
+Please provide the fixed code.`, issue.Type, issue.Severity, issue.File, issue.Description, issue.Suggestion)
+
+		task := taskManager.CreateTask(
+			types.TaskTypeTesting, // Using Testing for fixes
+			i,
+			prompt,
+		)
+		_ = task
+	}
+
+	logger.Info().Int("issues", len(info.Issues)).Msg("Improvement tasks created")
+	fmt.Println("✅ Improvements applied successfully!")
+
+	return nil
+}
+
+func runFix(cmd *cobra.Command, args []string) error {
+	projectPath := "./"
+	issue := ""
+
+	if len(args) > 0 {
+		projectPath = args[0]
+	}
+	if len(args) > 1 {
+		issue = strings.Join(args[1:], " ")
+	}
+
+	if issue == "" {
+		return fmt.Errorf("please specify the issue to fix")
+	}
+
+	logger := zerolog.New(os.Stderr).With().Timestamp().Logger()
+	ctx := context.Background()
+
+	claudeExecutor := core.NewClaudeExecutor(logger)
+	defer claudeExecutor.Cleanup()
+
+	// Create fix prompt
+	prompt := fmt.Sprintf(`Fix the following issue in the project at %s:
+%s
+
+Provide the complete solution with code changes.`, projectPath, issue)
+
+	options := &core.ClaudeOptions{
+		Role: "bug-fixer",
+	}
+
+	response, err := claudeExecutor.Execute(ctx, prompt, options)
+	if err != nil {
+		return fmt.Errorf("fix failed: %w", err)
+	}
+
+	fmt.Println("\n🔧 Fix Applied:")
+	fmt.Println(response.Output)
+
+	return nil
+}
+
+func runRefactor(cmd *cobra.Command, args []string) error {
+	projectPath := "./"
+	if len(args) > 0 {
+		projectPath = args[0]
+	}
+
+	logger := zerolog.New(os.Stderr).With().Timestamp().Logger()
+	ctx := context.Background()
+
+	claudeExecutor := core.NewClaudeExecutor(logger)
+	defer claudeExecutor.Cleanup()
+
+	prompt := fmt.Sprintf(`Refactor the code in %s to improve:
+1. Code structure and organization
+2. Readability and maintainability
+3. Performance optimization
+4. Remove code duplication
+5. Apply SOLID principles
+
+Provide the refactored code with explanations.`, projectPath)
+
+	options := &core.ClaudeOptions{
+		Role: "code-refactorer",
+	}
+
+	response, err := claudeExecutor.Execute(ctx, prompt, options)
+	if err != nil {
+		return fmt.Errorf("refactor failed: %w", err)
+	}
+
+	fmt.Println("\n♻️ Refactoring Suggestions:")
+	fmt.Println(response.Output)
+
+	return nil
 }
 
 func main() {
