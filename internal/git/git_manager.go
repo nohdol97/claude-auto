@@ -2,13 +2,13 @@ package git
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
+	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/nohdol/claude-auto/pkg/types"
 	"github.com/rs/zerolog"
@@ -98,7 +98,7 @@ func (gm *GitManager) SmartCommit(files []string, taskType types.TaskType) error
 			continue
 		}
 
-		if err := gm.worktree.Add(relPath); err != nil {
+		if _, err := gm.worktree.Add(relPath); err != nil {
 			gm.logger.Warn().
 				Str("file", relPath).
 				Err(err).
@@ -286,12 +286,11 @@ func (gm *GitManager) CreateBranch(name string) error {
 
 	// Create new branch
 	ref := fmt.Sprintf("refs/heads/%s", name)
-	refSpec := config.RefSpec(ref)
 
 	err = gm.repo.CreateBranch(&config.Branch{
 		Name:   name,
 		Remote: "origin",
-		Merge:  refSpec,
+		Merge:  plumbing.ReferenceName(ref),
 	})
 
 	if err != nil {

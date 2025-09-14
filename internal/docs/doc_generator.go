@@ -112,8 +112,6 @@ func (dg *DocGenerator) GenerateREADME(projectName, description string, features
 
 // UpdateMetrics updates project metrics in the documentation
 func (dg *DocGenerator) UpdateMetrics(metrics *ProjectMetrics) error {
-	metricsFile := filepath.Join(dg.outputDir, "metrics.json")
-
 	// For now, we'll just log the metrics
 	dg.logger.Info().
 		Int("lines_of_code", metrics.LinesOfCode).
@@ -186,7 +184,7 @@ const readmeTemplate = `# {{.ProjectName}}
 
 ## 📦 Installation
 
-\`\`\`bash
+` + "```bash" + `
 # Clone the repository
 git clone https://github.com/yourusername/{{.ProjectName}}.git
 
@@ -197,56 +195,56 @@ cd {{.ProjectName}}
 npm install
 # or
 yarn install
-\`\`\`
+` + "```" + `
 
 ## 🔧 Configuration
 
-Create a \`.env\` file based on \`.env.example\`:
+Create a ` + "`.env`" + ` file based on ` + "`.env.example`" + `:
 
-\`\`\`bash
+` + "```bash" + `
 cp .env.example .env
-\`\`\`
+` + "```" + `
 
 Update the environment variables as needed.
 
 ## 🏃 Running the Application
 
 ### Development
-\`\`\`bash
+` + "```bash" + `
 npm run dev
 # or
 yarn dev
-\`\`\`
+` + "```" + `
 
 ### Production
-\`\`\`bash
+` + "```bash" + `
 npm run build
 npm start
 # or
 yarn build
 yarn start
-\`\`\`
+` + "```" + `
 
 ## 🧪 Testing
 
-\`\`\`bash
+` + "```bash" + `
 npm test
 # or
 yarn test
-\`\`\`
+` + "```" + `
 
 ## 📝 API Documentation
 
-API documentation is available at \`/api/docs\` when running the application.
+API documentation is available at ` + "`/api/docs`" + ` when running the application.
 
 ## 🤝 Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
 
 1. Fork the repository
-2. Create your feature branch (\`git checkout -b feature/AmazingFeature\`)
-3. Commit your changes (\`git commit -m 'Add some AmazingFeature'\`)
-4. Push to the branch (\`git push origin feature/AmazingFeature\`)
+2. Create your feature branch (` + "`git checkout -b feature/AmazingFeature`" + `)
+3. Commit your changes (` + "`git commit -m 'Add some AmazingFeature'`" + `)
+4. Push to the branch (` + "`git push origin feature/AmazingFeature`" + `)
 5. Open a Pull Request
 
 ## 📄 License

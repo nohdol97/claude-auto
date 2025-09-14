@@ -3,7 +3,6 @@ package generators
 import (
 	"context"
 	"fmt"
-	"path/filepath"
 	"strings"
 
 	"github.com/nohdol/claude-auto/internal/core"

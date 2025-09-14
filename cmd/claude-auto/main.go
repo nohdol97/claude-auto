@@ -420,12 +420,6 @@ func runAnalyze(cmd *cobra.Command, args []string) error {
 	// Setup logger
 	logger := zerolog.New(os.Stderr).With().Timestamp().Logger()
 
-	// Load configuration
-	cfg, err := core.LoadConfig(configFile)
-	if err != nil {
-		cfg = core.GetDefaultConfig()
-	}
-
 	// Create context
 	ctx := context.Background()
 
